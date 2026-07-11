@@ -47,6 +47,15 @@ DEFAULT_COLUMN_NAMES = {
 
 LANG_KEYS = ["task", "sub_task"]
 
+VIDEO_KEY_ALIASES = {
+    "res256_image_side_0": "robot0_agentview_left",
+    "res256_image_side_1": "robot0_agentview_right",
+    "res256_image_wrist_0": "robot0_eye_in_hand",
+}
+ANNOTATION_KEY_ALIASES = {
+    "human.action.task_description": "human.task_description",
+}
+
 
 def _rec_defaultdict() -> defaultdict:
     """Factory that creates an infinitely nestable defaultdict."""
@@ -241,7 +250,11 @@ class LeRobotEpisodeLoader:
         if "video" in modality_configs and "video" in self.modality_meta:
             config_keys = set(modality_configs["video"].modality_keys)
             meta_keys = set(self.modality_meta["video"].keys())
-            missing_keys = config_keys - meta_keys
+            missing_keys = {
+                key
+                for key in config_keys
+                if key not in meta_keys and self._resolve_video_key(key) not in meta_keys
+            }
             if missing_keys:
                 raise ValueError(
                     f"Video modality_keys {sorted(missing_keys)} in modality_config "
@@ -253,6 +266,12 @@ class LeRobotEpisodeLoader:
                 )
 
         return modality_configs
+
+    def _resolve_video_key(self, image_key: str) -> str:
+        return VIDEO_KEY_ALIASES.get(image_key, image_key)
+
+    def _resolve_annotation_key(self, subkey: str) -> str:
+        return ANNOTATION_KEY_ALIASES.get(subkey, subkey)
 
     def __len__(self) -> int:
         """Return number of episodes in dataset."""
@@ -331,10 +350,11 @@ class LeRobotEpisodeLoader:
                     continue
                 assert key.startswith("annotation.")
                 subkey = key.replace("annotation.", "")
-                assert subkey in self.modality_meta["annotation"], (
+                meta_subkey = self._resolve_annotation_key(subkey)
+                assert meta_subkey in self.modality_meta["annotation"], (
                     f"Key {subkey} not found in language modality"
                 )
-                original_key = self.modality_meta["annotation"][subkey].get("original_key", key)
+                original_key = self.modality_meta["annotation"][meta_subkey].get("original_key", key)
                 loaded_df[f"language.{key}"] = original_df[original_key].apply(
                     lambda x: self.tasks_map[x]
                 )
@@ -377,7 +397,8 @@ class LeRobotEpisodeLoader:
 
         for image_key in image_keys:
             # Resolve the original key used in video file naming
-            original_key = self.modality_meta["video"][image_key].get(
+            meta_image_key = self._resolve_video_key(image_key)
+            original_key = self.modality_meta["video"][meta_image_key].get(
                 "original_key", f"observation.images.{image_key}"
             )
             assert original_key in self.feature_config, (
