@@ -386,6 +386,22 @@ def get_frames_by_indices(
         return frames.asnumpy()
     elif video_backend == "ffmpeg":
         return _extract_frames_ffmpeg(video_path, list(indices))
+    elif video_backend == "pyav":
+        requested_indices = np.asarray(indices, dtype=np.int64)
+        requested_set = set(requested_indices.tolist())
+        frames_by_index = {}
+        with av.open(video_path) as container:
+            for frame_index, frame in enumerate(container.decode(video=0)):
+                if frame_index in requested_set:
+                    frames_by_index[frame_index] = frame.to_ndarray(format="rgb24")
+                    if len(frames_by_index) == len(requested_set):
+                        break
+        missing_indices = [idx for idx in requested_indices.tolist() if idx not in frames_by_index]
+        if missing_indices:
+            raise ValueError(
+                f"Unable to read frame indices {missing_indices[:10]} from {video_path}"
+            )
+        return np.stack([frames_by_index[idx] for idx in requested_indices.tolist()])
     elif video_backend == "opencv":
         frames = []
         cap = cv2.VideoCapture(video_path, **video_backend_kwargs)
