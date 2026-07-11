@@ -13,9 +13,9 @@ ROBOCASA_PANDA_OMRON_CONFIG = {
     "video": ModalityConfig(
         delta_indices=[0],
         modality_keys=[
-            "robot0_agentview_left",
-            "robot0_agentview_right",
-            "robot0_eye_in_hand",
+            "res256_image_side_0",
+            "res256_image_side_1",
+            "res256_image_wrist_0",
         ],
     ),
     "state": ModalityConfig(
@@ -67,7 +67,7 @@ ROBOCASA_PANDA_OMRON_CONFIG = {
     ),
     "language": ModalityConfig(
         delta_indices=[0],
-        modality_keys=["annotation.human.task_description"],
+        modality_keys=["annotation.human.action.task_description"],
     ),
 }
 
